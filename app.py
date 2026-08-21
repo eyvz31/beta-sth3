@@ -107,7 +107,6 @@ def diffusion_time(membrane_thickness_um, D_eff):
 
 
 def transport_index(molecule, pore_diameter_nm, fouling=0.0):
-
     steric = steric_partition(
         pore_diameter_nm / 2.0, molecule.radius_nm, molecule.shape
     )
@@ -115,8 +114,10 @@ def transport_index(molecule, pore_diameter_nm, fouling=0.0):
     return max(0.0, min(1.0, steric * binding_penalty))
 
 
-def immunoisolation_index(antibody_transport):
-    return (1.0 - max(0.0, min(1.0, antibody_transport))) * 100.0
+def calculate_composite_score(g_tr, i_tr, a_tr):
+    """Единая функция расчета Composite Score"""
+    exclusion = 1.0 - a_tr
+    return 0.35 * g_tr + 0.35 * i_tr + 0.30 * exclusion
 
 
 st.set_page_config(page_title="Membrane Immunoisolation Simulator", layout="wide")
@@ -239,7 +240,7 @@ if btn_opt:
         if a_tr > 0.01:
             score = 0.0
         else:
-            score = 0.50 * g_tr + 0.50 * i_tr
+            score = calculate_composite_score(g_tr, i_tr, a_tr)
 
         candidate = (score, p, g_tr, i_tr, exclusion)
 
@@ -310,7 +311,7 @@ elif btn_sens:
             i = transport_index(molecules[1], p_pore, p_fouling)
             a = transport_index(molecules[2], p_pore, p_fouling)
 
-            score = 0.4 * g + 0.4 * i + 0.2 * (1 - a)
+            score = calculate_composite_score(g, i, a)
             values.append(factor)
             scores.append(score * 100)
 
@@ -396,11 +397,8 @@ else:
     glucose_transport = transports["Glucose"]
     insulin_transport = transports["Insulin"]
 
-    immunoisolation = immunoisolation_index(antibody_transport)
-    score = (
-        0.35 * glucose_transport
-        + 0.35 * insulin_transport
-        + 0.30 * (immunoisolation / 100)
+    score = calculate_composite_score(
+        glucose_transport, insulin_transport, antibody_transport
     )
 
     lines.extend(
@@ -409,7 +407,7 @@ else:
             "",
             f"Glucose transport:      {glucose_transport*100:.2f}%",
             f"Insulin transport:      {insulin_transport*100:.2f}%",
-            f"Antibody exclusion:     {immunoisolation:.2f}%",
+            f"Antibody exclusion:     {(1.0 - antibody_transport)*100:.2f}%",
             f"Composite score:        {score*100:.2f}%",
             "",
         ]
