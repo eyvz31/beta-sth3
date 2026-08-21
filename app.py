@@ -106,27 +106,13 @@ def diffusion_time(membrane_thickness_um, D_eff):
     return L * L / (2.0 * D_eff)
 
 
-def relative_transport(molecule, pore_diameter_nm, fouling=0.0):
-    """Рассчитывает селективность самой поры (от 0.0 до 1.0)"""
+def transport_index(molecule, pore_diameter_nm, fouling=0.0):
+
     steric = steric_partition(
         pore_diameter_nm / 2.0, molecule.radius_nm, molecule.shape
     )
     binding_penalty = 1.0 - min(0.99, max(0.0, molecule.binding + fouling))
-    return steric * binding_penalty
-
-
-def transport_fraction(
-    molecule,
-    pore_diameter_nm,
-    porosity,
-    tortuosity,
-    material_factor,
-    fouling,
-):
-    """Абсолютный транспорт сквозь всю мембрану"""
-    rel = relative_transport(molecule, pore_diameter_nm, fouling)
-    value = rel * porosity * material_factor / max(tortuosity**2, 1e-12)
-    return max(0.0, min(1.0, value))
+    return max(0.0, min(1.0, steric * binding_penalty))
 
 
 def immunoisolation_index(antibody_transport):
@@ -244,18 +230,18 @@ if btn_opt:
     pore_values = np.linspace(0.5, 30.0, 600)
 
     for p in pore_values:
-        g_rel = relative_transport(molecules[0], p, fouling)
-        i_rel = relative_transport(molecules[1], p, fouling)
-        a_rel = relative_transport(molecules[2], p, fouling)
+        g_tr = transport_index(molecules[0], p, fouling)
+        i_tr = transport_index(molecules[1], p, fouling)
+        a_tr = transport_index(molecules[2], p, fouling)
 
-        exclusion = 1.0 - a_rel
+        exclusion = 1.0 - a_tr
 
-        if a_rel > 0.01:
+        if a_tr > 0.01:
             score = 0.0
         else:
-            score = 0.50 * g_rel + 0.50 * i_rel
+            score = 0.50 * g_tr + 0.50 * i_tr
 
-        candidate = (score, p, g_rel, i_rel, exclusion)
+        candidate = (score, p, g_tr, i_tr, exclusion)
 
         if best is None or candidate[0] > best[0]:
             best = candidate
@@ -282,19 +268,10 @@ if btn_opt:
         p_vals = np.linspace(0.5, max(30.0, opt_pore * 3), 300)
         for molecule in molecules:
             vals = [
-                transport_fraction(
-                    molecule,
-                    p,
-                    porosity,
-                    tortuosity,
-                    material_data["permeability"],
-                    fouling,
-                )
-                * 100
-                for p in p_vals
+                transport_index(molecule, p, fouling) * 100 for p in p_vals
             ]
             ax.plot(p_vals, vals, label=molecule.name)
-        ax.axvline(opt_pore, linestyle="--")
+        ax.axvline(opt_pore, linestyle="--", color="gray", label="Optimal Pore")
         ax.set_xlabel("Pore diameter (nm)")
         ax.set_ylabel("Transport index (%)")
         ax.set_title("Transport vs Pore Diameter")
@@ -329,30 +306,9 @@ elif btn_sens:
             elif parameter == "fouling":
                 p_fouling = min(0.99, fouling * factor)
 
-            g = transport_fraction(
-                molecules[0],
-                p_pore,
-                p_porosity,
-                p_tortuosity,
-                material_data["permeability"],
-                p_fouling,
-            )
-            i = transport_fraction(
-                molecules[1],
-                p_pore,
-                p_porosity,
-                p_tortuosity,
-                material_data["permeability"],
-                p_fouling,
-            )
-            a = transport_fraction(
-                molecules[2],
-                p_pore,
-                p_porosity,
-                p_tortuosity,
-                material_data["permeability"],
-                p_fouling,
-            )
+            g = transport_index(molecules[0], p_pore, p_fouling)
+            i = transport_index(molecules[1], p_pore, p_fouling)
+            a = transport_index(molecules[2], p_pore, p_fouling)
 
             score = 0.4 * g + 0.4 * i + 0.2 * (1 - a)
             values.append(factor)
@@ -415,15 +371,8 @@ else:
             fouling,
         )
         time_s = diffusion_time(thickness, D_eff)
-        transport = transport_fraction(
-            molecule,
-            pore,
-            porosity,
-            tortuosity,
-            material_data["permeability"],
-            fouling,
-        )
-        transports[molecule.name] = transport
+        tr = transport_index(molecule, pore, fouling)
+        transports[molecule.name] = tr
 
         lines.extend(
             [
@@ -438,7 +387,7 @@ else:
                     if math.isinf(time_s)
                     else f"  Characteristic time:   {time_s/60:.4f} min"
                 ),
-                f"  Transport index:       {transport*100:.2f}%",
+                f"  Transport index:       {tr*100:.2f}%",
                 "",
             ]
         )
@@ -477,20 +426,11 @@ else:
 
         for molecule in molecules:
             values = [
-                transport_fraction(
-                    molecule,
-                    p,
-                    porosity,
-                    tortuosity,
-                    material_data["permeability"],
-                    fouling,
-                )
-                * 100
-                for p in pore_values
+                transport_index(molecule, p, fouling) * 100 for p in pore_values
             ]
             ax.plot(pore_values, values, label=molecule.name)
 
-        ax.axvline(pore, linestyle="--")
+        ax.axvline(pore, linestyle="--", color="gray", label="Current Pore")
         ax.set_xlabel("Pore diameter (nm)")
         ax.set_ylabel("Transport index (%)")
         ax.set_title("Transport vs Pore Diameter")
