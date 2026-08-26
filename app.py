@@ -347,7 +347,6 @@ elif btn_sens:
 
 else:
     lines = [
-        "MEMBRANE IMMUNOISOLATION SIMULATION",
         "",
         f"Material:               {material_name}",
         f"Mean pore diameter:    {pore:.3f} nm",
