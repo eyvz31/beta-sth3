@@ -120,8 +120,8 @@ def calculate_composite_score(g_tr, i_tr, a_tr):
     return 0.35 * g_tr + 0.35 * i_tr + 0.30 * exclusion
 
 
-st.set_page_config(page_title="Membrane Immunoisolation Simulator", layout="wide")
-st.title("Membrane Immunoisolation Simulator")
+st.set_page_config(layout="wide")
+
 
 col_left, col_middle = st.columns(2)
 
